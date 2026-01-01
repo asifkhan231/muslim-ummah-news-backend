@@ -18,7 +18,7 @@ database.connect().catch(error => {
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  remote:'*' // Adjust this in production to restrict origins
+  origin: '*'// Adjust this in production to restrict origins
 }));
 
 // Trust proxy for rate limiting (needed when behind reverse proxy/load balancer)
