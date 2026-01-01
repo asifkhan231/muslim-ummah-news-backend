@@ -1,0 +1,40 @@
+{
+  "name": "ummah-news-hub-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Ummah News Hub - comprehensive Muslim community news platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "scrape": "node scripts/scraper.js",
+    "seed": "node scripts/seed-sources.js",
+    "scheduler": "node scripts/scheduler.js"
+  },
+  "dependencies": {
+    "axios": "^1.5.0",
+    "cheerio": "^1.0.0-rc.10",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.10.0",
+    "groq-sdk": "^0.37.0",
+    "helmet": "^7.0.0",
+    "mongoose": "^7.5.0",
+    "node-cron": "^3.0.2",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "news",
+    "muslim",
+    "ummah",
+    "islamic",
+    "community",
+    "api",
+    "comprehensive"
+  ],
+  "author": "",
+  "license": "MIT"
+}
