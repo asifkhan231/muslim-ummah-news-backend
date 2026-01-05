@@ -148,7 +148,7 @@ class ScrapingConfig {
 
   // Cron schedule for scraping
   getCronSchedule() {
-    return `0 */2 * * *`;
+    return `* */3 * * *`;
   }
 
   // Validation rules for sources
