@@ -8,7 +8,11 @@
     "dev": "nodemon index.js",
     "scrape": "node scripts/scraper.js",
     "seed": "node scripts/seed-sources.js",
-    "scheduler": "node scripts/scheduler.js"
+    "scheduler": "node scripts/scheduler.js",
+    "recategorize": "node scripts/recategorize-articles.js",
+    "add-hr-sources": "node scripts/add-human-rights-sources.js",
+    "scrape-hr": "node scripts/scrape-human-rights.js",
+    "migrate-categories": "node scripts/migrate-tragedy-to-professional.js"
   },
   "dependencies": {
     "axios": "^1.5.0",

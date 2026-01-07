@@ -39,7 +39,8 @@ const sourceSchema = new mongoose.Schema({
     enum: [
       'palestine', 'middle-east', 'south-asia', 'southeast-asia', 'africa', 
       'europe', 'americas', 'community', 'culture', 'economics', 'politics', 
-      'education', 'technology', 'health', 'sports', 'general'
+      'education', 'technology', 'health', 'sports', 'human-rights', 
+      'conflict', 'persecution', 'general'
     ]
   }]
 }, {

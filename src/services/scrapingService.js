@@ -251,6 +251,15 @@ class ScrapingService {
         return null;
       }
 
+      // MUSLIM-FOCUSED FILTERING - Check if content is related to Muslims
+      const fullText = `${title} ${content}`.toLowerCase();
+      const isMuslimRelated = this.isMuslimRelated(fullText);
+      
+      if (!isMuslimRelated) {
+        console.log(`     ❌ Skipping - not Muslim-related content`);
+        return null;
+      }
+
       // Skip articles with generic or vague titles (Enhanced filter)
       const lowerTitle = title.toLowerCase();
       if (title.length < 20 ||
@@ -605,20 +614,148 @@ class ScrapingService {
 
   categorizeArticle(text) {
     const lowerText = text.toLowerCase();
-
-    // Check each category's keywords
+    
+    // Create a scoring system for better categorization
+    const categoryScores = {};
+    
+    // Initialize scores
+    for (const category of Object.keys(this.categoryKeywords)) {
+      categoryScores[category] = 0;
+    }
+    
+    // Score each category based on keyword matches
     for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
-      if (keywords.some(keyword => lowerText.includes(keyword))) {
-        return category;
+      for (const keyword of keywords) {
+        const keywordLower = keyword.toLowerCase();
+        
+        // Use word boundaries for better matching
+        const regex = new RegExp(`\\b${keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        const matches = (lowerText.match(regex) || []).length;
+        
+        if (matches > 0) {
+          // Give higher weight to longer, more specific keywords
+          let weight = 1;
+          if (keyword.length > 15) weight = 4;
+          else if (keyword.length > 10) weight = 3;
+          else if (keyword.length > 5) weight = 2;
+          
+          // Boost score for exact phrase matches
+          if (keyword.includes(' ') && lowerText.includes(keywordLower)) {
+            weight *= 2;
+          }
+          
+          categoryScores[category] += matches * weight;
+        }
       }
     }
-
+    
+    // Apply category-specific rules and penalties
+    
+    // If it's clearly about war/conflict but not specifically Palestinian, don't categorize as Palestine
+    if (lowerText.includes('war') || lowerText.includes('conflict') || lowerText.includes('attack')) {
+      if (!lowerText.includes('gaza') && !lowerText.includes('west bank') && !lowerText.includes('israeli occupation')) {
+        categoryScores['palestine'] = Math.max(0, categoryScores['palestine'] - 3);
+      }
+    }
+    
+    // Boost politics for government/political terms
+    if (lowerText.includes('president') || lowerText.includes('government') || lowerText.includes('minister') || 
+        lowerText.includes('election') || lowerText.includes('parliament') || lowerText.includes('diplomatic')) {
+      categoryScores['politics'] = (categoryScores['politics'] || 0) + 2;
+    }
+    
+    // Boost technology for tech terms
+    if (lowerText.includes('drone') || lowerText.includes('missile') || lowerText.includes('cyber') || 
+        lowerText.includes('digital') || lowerText.includes('software') || lowerText.includes('app')) {
+      // But only if it's actually about technology, not military
+      if (!lowerText.includes('attack') && !lowerText.includes('military') && !lowerText.includes('war')) {
+        categoryScores['technology'] = (categoryScores['technology'] || 0) + 3;
+      }
+    }
+    
+    // Find the category with the highest score
+    let bestCategory = 'general';
+    let highestScore = 0;
+    
+    for (const [category, score] of Object.entries(categoryScores)) {
+      if (score > highestScore) {
+        highestScore = score;
+        bestCategory = category;
+      }
+    }
+    
+    // Only assign a specific category if the score is significant enough
+    // Increased threshold for better accuracy
+    if (highestScore >= 3) {
+      console.log(`     📂 Categorized as: ${bestCategory} (score: ${highestScore})`);
+      return bestCategory;
+    }
+    
+    console.log(`     📂 Categorized as: general (no strong category match, highest: ${bestCategory}:${highestScore})`);
     return 'general';
   }
 
   extractTags(text) {
     const lowerText = text.toLowerCase();
     return this.contentTags.filter(tag => lowerText.includes(tag));
+  }
+
+  // NEW METHOD: Check if content is related to Muslims
+  isMuslimRelated(text) {
+    const muslimKeywords = [
+      // Core Muslim identifiers
+      'muslim', 'muslims', 'islamic', 'islam', 'ummah', 'mosque', 'masjid',
+      'quran', 'hadith', 'allah', 'prophet muhammad', 'ramadan', 'eid', 'hajj',
+      'halal', 'haram', 'sharia', 'imam', 'sheikh', 'mullah',
+      
+      // Specific Muslim communities and regions (from your guidance)
+      'uyghur', 'uighur', 'rohingya', 'palestinian', 'gaza', 'west bank',
+      'xinjiang', 'kashmir', 'kashmiri', 'bosnian muslim', 'yazidi',
+      
+      // Muslim-majority countries and regions
+      'afghanistan', 'pakistan', 'bangladesh', 'indonesia', 'malaysia',
+      'turkey', 'iran', 'iraq', 'syria', 'lebanon', 'jordan', 'egypt',
+      'saudi arabia', 'uae', 'qatar', 'kuwait', 'bahrain', 'oman',
+      'morocco', 'algeria', 'tunisia', 'libya', 'sudan', 'somalia',
+      'nigeria', 'mali', 'senegal', 'chad', 'niger',
+      
+      // Muslim organizations and movements
+      'islamic state', 'taliban', 'hamas', 'hezbollah', 'muslim brotherhood',
+      'islamic society', 'muslim council', 'islamic center', 'muslim association',
+      
+      // Issues affecting Muslims (from your guidance)
+      'islamophobia', 'anti-muslim', 'muslim persecution', 'religious persecution',
+      'muslim minority', 'muslim community', 'islamic community',
+      
+      // Specific crisis regions you mentioned
+      'occupied palestinian territory', 'rohingya crisis', 'uyghur persecution',
+      'anti-muslim violence', 'communal violence', 'sectarian violence'
+    ];
+
+    // Check if any Muslim-related keywords are present
+    for (const keyword of muslimKeywords) {
+      if (text.includes(keyword.toLowerCase())) {
+        console.log(`     ✅ Muslim-related content detected: "${keyword}"`);
+        return true;
+      }
+    }
+
+    // Additional check for Muslim names and terms
+    const muslimNamePatterns = [
+      /\b(muhammad|mohammed|ahmad|ali|hassan|hussain|fatima|aisha|khadija|omar|umar|abu|ibn)\b/i,
+      /\b(al-|bin |bint )/i, // Arabic name patterns
+      /\b(mosque|masjid|minaret|mihrab|qibla)\b/i,
+      /\b(sunni|shia|sufi|salafi|wahhabi)\b/i
+    ];
+
+    for (const pattern of muslimNamePatterns) {
+      if (pattern.test(text)) {
+        console.log(`     ✅ Muslim-related content detected via pattern: ${pattern}`);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   generateBetterSummary($, content, title, source) {

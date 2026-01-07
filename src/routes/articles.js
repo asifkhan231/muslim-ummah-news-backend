@@ -17,11 +17,11 @@ router.get('/popular', articleController.getPopularArticles);
 // Search articles
 router.get('/search', articleController.searchArticles);
 
-// Get single article by ID
-router.get('/:id', articleController.getArticleById);
-
-// Get articles by category
+// Get articles by category - MUST come before /:id route
 router.get('/category/:category', articleController.getArticlesByCategory);
+
+// Get single article by ID - MUST come after specific routes
+router.get('/:id', articleController.getArticleById);
 
 // Create new article (admin only - you might want to add authentication)
 router.post('/', articleController.createArticle);
