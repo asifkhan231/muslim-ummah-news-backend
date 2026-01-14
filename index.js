@@ -43,8 +43,8 @@ app.use(limiter);
 
 const startScheduler = () => {
   let cronExpression = ScrapingConfig.getCronSchedule();
+  console.log("cron expression====>",cronExpression)
     console.log(`⏰ Starting scheduler with expression: ${cronExpression}`);
-    console.log(`🔄 Will run every ${ScrapingConfig.scrapeIntervalHours} hours`);
     
     cron.schedule(cronExpression, async () => {
 
