@@ -37,10 +37,10 @@ const sourceSchema = new mongoose.Schema({
   categories: [{
     type: String,
     enum: [
-      'palestine', 'middle-east', 'south-asia', 'southeast-asia', 'africa', 
-      'europe', 'americas', 'community', 'culture', 'economics', 'politics', 
-      'education', 'technology', 'health', 'sports', 'human-rights', 
-      'conflict', 'persecution', 'general'
+      'palestine', 'middle-east', 'south-asia', 'southeast-asia', 'east-asia', 'asia', 'africa',
+      'europe', 'americas', 'community', 'culture', 'economics', 'politics',
+      'education', 'technology', 'health', 'sports', 'human-rights',
+      'conflict', 'persecution', 'achievements', 'general'
     ]
   }]
 }, {

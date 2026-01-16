@@ -4,6 +4,7 @@ const scrapingConfig = require('../../config/scraping');
 const articleService = require('./articleService');
 const sourceService = require('./sourceService');
 const aiRefinementService = require('./aiServices');
+const ytSearch = require('yt-search');
 
 class ScrapingService {
   constructor() {
@@ -247,17 +248,31 @@ class ScrapingService {
       console.log(`     Video: ${videoUrl ? 'Found' : 'Not found'}`);
 
       if (!title) {
-        console.log(`     ❌ Skipping - no title found`);
+        console.log(`❌ Skipping - no title found`);
         return null;
       }
 
       // MUSLIM-FOCUSED FILTERING - Check if content is related to Muslims
+      // EXCEPTION: Always accept articles from purely Islamic/regional sources if they pass basic checks
+      const isTrustedSource = ['Middle East Eye', 'The New Arab', 'Muslim News', 'Palestine Chronicle', 'Daily Sabah', 'Al Araby'].some(s => source.name.includes(s));
+
       const fullText = `${title} ${content}`.toLowerCase();
       const isMuslimRelated = this.isMuslimRelated(fullText);
-      
-      if (!isMuslimRelated) {
-        console.log(`     ❌ Skipping - not Muslim-related content`);
-        return null;
+
+      // If it's a trusted Muslim-specific source, be more lenient, but still filter generic "World" news if it creates noise.
+      // For Al Jazeera/TRT (Global channels), we keep the filter but maybe relax it?
+      // User requested "Al Jazeera... some remains untouched". We should likely trust Al Jazeera more or improve keywords.
+      // Let's accept if it is Muslim related OR if the source is specifically "Muslim News" etc.
+
+      if (!isMuslimRelated && !isTrustedSource) {
+        // Special check for Al Jazeera/TRT - if they are in the "Middle East" category or similar, keep them.
+        if ((source.name.includes('Al Jazeera') || source.name.includes('TRT')) &&
+          (url.includes('/middle-east') || url.includes('/turkey') || url.includes('/iran') || url.includes('/palestine'))) {
+          // Keep it
+        } else {
+          console.log(`❌ Skipping - not Muslim-related content`);
+          return null;
+        }
       }
 
       // Skip articles with generic or vague titles (Enhanced filter)
@@ -316,14 +331,30 @@ class ScrapingService {
       // Determine category based on content
       const category = this.categorizeArticle(title + ' ' + content);
 
-      const resolvedVideoUrl = this.resolveUrl(videoUrl, source.baseUrl || source.url);
+      let resolvedVideoUrl = this.resolveUrl(videoUrl, source.baseUrl || source.url);
+
+      // VIDEO SEARCH FALLBACK
+      if (!resolvedVideoUrl) {
+        console.log('     🎥 No video found, searching for relevant video...');
+        try {
+          const videoResult = await this.searchVideo(`${title} ${source.name}`);
+          if (videoResult) {
+            resolvedVideoUrl = videoResult;
+            console.log(`     ✅ Found video via search: ${resolvedVideoUrl}`);
+          } else {
+            console.log('     ⚠️  No relevant video found via search');
+          }
+        } catch (err) {
+          console.error('     ❌ Video search failed:', err.message);
+        }
+      }
 
       let finalTitle = title;
       let finalContent = content;
       let aiFacts = [];
       let isAIEnhanced = false;
       let backgroundContext = '';
-      
+
       // AI refinement for better content quality
       if (content && content.length > 300) {
         try {
@@ -532,16 +563,16 @@ class ScrapingService {
         imgSrc = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src');
       }
 
-      if (imgSrc && imgSrc.length > 10 && 
-          !imgSrc.includes('logo') && 
-          !imgSrc.includes('icon') &&
-          !imgSrc.includes('favicon') &&
-          !imgSrc.includes('placeholder') &&
-          !imgSrc.endsWith('.svg')) {
-        
+      if (imgSrc && imgSrc.length > 10 &&
+        !imgSrc.includes('logo') &&
+        !imgSrc.includes('icon') &&
+        !imgSrc.includes('favicon') &&
+        !imgSrc.includes('placeholder') &&
+        !imgSrc.endsWith('.svg')) {
+
         // Clean up the URL
         imgSrc = imgSrc.trim();
-        
+
         // Remove query parameters that might break the image
         if (imgSrc.includes('?')) {
           const urlParts = imgSrc.split('?');
@@ -553,7 +584,7 @@ class ScrapingService {
             imgSrc = urlParts[0];
           }
         }
-        
+
         console.log(`     Found image: ${imgSrc.substring(0, 80)}...`);
         return imgSrc;
       }
@@ -614,83 +645,83 @@ class ScrapingService {
 
   categorizeArticle(text) {
     const lowerText = text.toLowerCase();
-    
+
     // Create a scoring system for better categorization
     const categoryScores = {};
-    
+
     // Initialize scores
     for (const category of Object.keys(this.categoryKeywords)) {
       categoryScores[category] = 0;
     }
-    
+
     // Score each category based on keyword matches
     for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
       for (const keyword of keywords) {
         const keywordLower = keyword.toLowerCase();
-        
+
         // Use word boundaries for better matching
         const regex = new RegExp(`\\b${keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
         const matches = (lowerText.match(regex) || []).length;
-        
+
         if (matches > 0) {
           // Give higher weight to longer, more specific keywords
           let weight = 1;
           if (keyword.length > 15) weight = 4;
           else if (keyword.length > 10) weight = 3;
           else if (keyword.length > 5) weight = 2;
-          
+
           // Boost score for exact phrase matches
           if (keyword.includes(' ') && lowerText.includes(keywordLower)) {
             weight *= 2;
           }
-          
+
           categoryScores[category] += matches * weight;
         }
       }
     }
-    
+
     // Apply category-specific rules and penalties
-    
+
     // If it's clearly about war/conflict but not specifically Palestinian, don't categorize as Palestine
     if (lowerText.includes('war') || lowerText.includes('conflict') || lowerText.includes('attack')) {
       if (!lowerText.includes('gaza') && !lowerText.includes('west bank') && !lowerText.includes('israeli occupation')) {
         categoryScores['palestine'] = Math.max(0, categoryScores['palestine'] - 3);
       }
     }
-    
+
     // Boost politics for government/political terms
-    if (lowerText.includes('president') || lowerText.includes('government') || lowerText.includes('minister') || 
-        lowerText.includes('election') || lowerText.includes('parliament') || lowerText.includes('diplomatic')) {
+    if (lowerText.includes('president') || lowerText.includes('government') || lowerText.includes('minister') ||
+      lowerText.includes('election') || lowerText.includes('parliament') || lowerText.includes('diplomatic')) {
       categoryScores['politics'] = (categoryScores['politics'] || 0) + 2;
     }
-    
+
     // Boost technology for tech terms
-    if (lowerText.includes('drone') || lowerText.includes('missile') || lowerText.includes('cyber') || 
-        lowerText.includes('digital') || lowerText.includes('software') || lowerText.includes('app')) {
+    if (lowerText.includes('drone') || lowerText.includes('missile') || lowerText.includes('cyber') ||
+      lowerText.includes('digital') || lowerText.includes('software') || lowerText.includes('app')) {
       // But only if it's actually about technology, not military
       if (!lowerText.includes('attack') && !lowerText.includes('military') && !lowerText.includes('war')) {
         categoryScores['technology'] = (categoryScores['technology'] || 0) + 3;
       }
     }
-    
+
     // Find the category with the highest score
     let bestCategory = 'general';
     let highestScore = 0;
-    
+
     for (const [category, score] of Object.entries(categoryScores)) {
       if (score > highestScore) {
         highestScore = score;
         bestCategory = category;
       }
     }
-    
+
     // Only assign a specific category if the score is significant enough
     // Increased threshold for better accuracy
     if (highestScore >= 3) {
       console.log(`     📂 Categorized as: ${bestCategory} (score: ${highestScore})`);
       return bestCategory;
     }
-    
+
     console.log(`     📂 Categorized as: general (no strong category match, highest: ${bestCategory}:${highestScore})`);
     return 'general';
   }
@@ -707,26 +738,26 @@ class ScrapingService {
       'muslim', 'muslims', 'islamic', 'islam', 'ummah', 'mosque', 'masjid',
       'quran', 'hadith', 'allah', 'prophet muhammad', 'ramadan', 'eid', 'hajj',
       'halal', 'haram', 'sharia', 'imam', 'sheikh', 'mullah',
-      
+
       // Specific Muslim communities and regions (from your guidance)
       'uyghur', 'uighur', 'rohingya', 'palestinian', 'gaza', 'west bank',
       'xinjiang', 'kashmir', 'kashmiri', 'bosnian muslim', 'yazidi',
-      
+
       // Muslim-majority countries and regions
       'afghanistan', 'pakistan', 'bangladesh', 'indonesia', 'malaysia',
       'turkey', 'iran', 'iraq', 'syria', 'lebanon', 'jordan', 'egypt',
       'saudi arabia', 'uae', 'qatar', 'kuwait', 'bahrain', 'oman',
       'morocco', 'algeria', 'tunisia', 'libya', 'sudan', 'somalia',
       'nigeria', 'mali', 'senegal', 'chad', 'niger',
-      
+
       // Muslim organizations and movements
       'islamic state', 'taliban', 'hamas', 'hezbollah', 'muslim brotherhood',
       'islamic society', 'muslim council', 'islamic center', 'muslim association',
-      
+
       // Issues affecting Muslims (from your guidance)
       'islamophobia', 'anti-muslim', 'muslim persecution', 'religious persecution',
       'muslim minority', 'muslim community', 'islamic community',
-      
+
       // Specific crisis regions you mentioned
       'occupied palestinian territory', 'rohingya crisis', 'uyghur persecution',
       'anti-muslim violence', 'communal violence', 'sectarian violence'
@@ -756,6 +787,16 @@ class ScrapingService {
     }
 
     return false;
+  }
+
+  async searchVideo(query) {
+    try {
+      const r = await ytSearch(query);
+      return r.videos.length > 0 ? r.videos[0].url : null;
+    } catch (e) {
+      console.error('Video search helper error:', e.message);
+      return null;
+    }
   }
 
   generateBetterSummary($, content, title, source) {
@@ -1064,7 +1105,7 @@ class ScrapingService {
         return url;
       }
     }
-    
+
     // For relative URLs, combine with baseUrl
     try {
       const resolvedUrl = new URL(url, baseUrl).href;
