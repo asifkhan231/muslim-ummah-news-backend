@@ -34,7 +34,7 @@ const articleSchema = new mongoose.Schema({
     default: Date.now
   },
   aiFacts:{
-    type:[String],
+    type: mongoose.Schema.Types.Mixed,
     default:[]
   },
   isAiInhanced:{
@@ -50,7 +50,8 @@ const articleSchema = new mongoose.Schema({
     enum: [
       'palestine', 'middle-east', 'south-asia', 'southeast-asia', 'africa',
       'europe', 'americas', 'community', 'culture', 'economics', 'politics',
-      'education', 'technology', 'health', 'sports', 'tragedy', 'general'
+      'education', 'technology', 'health', 'sports', 'human-rights', 
+      'conflict', 'persecution', 'general'
     ],
     default: 'general'
   },

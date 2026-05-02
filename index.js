@@ -5,6 +5,10 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 const database = require('./config/database');
+const ScrapingConfig = require('./config/scraping');
+const cron = require('node-cron');
+const scrapingService = require('./src/services/scrapingService');
+// const NewsScheduler = require('./scripts/scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,6 +40,27 @@ const limiter = rateLimit({
   }
 });
 app.use(limiter);
+
+const startScheduler = () => {
+  let cronExpression = ScrapingConfig.getCronSchedule();
+  console.log("cron expression====>",cronExpression)
+    console.log(`⏰ Starting scheduler with expression: ${cronExpression}`);
+    
+    cron.schedule(cronExpression, async () => {
+
+      try {
+        console.log('🔍 Starting scheduled scraping...');
+        const articlesCount = await scrapingService.scrapeAllSources();
+        console.log(`✅ Scheduled scraping completed. Articles scraped: ${articlesCount}`);
+      } catch (error) {
+        console.error('❌ Scheduled scraping error:', error);
+      } 
+    });
+  }
+
+  startScheduler()
+
+  
 
 // Body parsing middleware
 app.use(express.json());
@@ -83,18 +108,34 @@ const server = app.listen(PORT, () => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('� SIGTERM wreceived, shutting down gracefully');
+  console.log('🛑 SIGTERM received, shutting down gracefully');
   server.close(async () => {
-    await database.disconnect();
-    process.exit(0);
+    try {
+      if (typeof scheduler !== 'undefined') {
+        await scheduler.stop();
+      }
+      await database.disconnect();
+    } catch (err) {
+      console.error('Error during shutdown:', err);
+    } finally {
+      process.exit(0);
+    }
   });
 });
 
 process.on('SIGINT', async () => {
   console.log('🛑 SIGINT received, shutting down gracefully');
   server.close(async () => {
-    await database.disconnect();
-    process.exit(0);
+    try {
+      if (typeof scheduler !== 'undefined') {
+        await scheduler.stop();
+      }
+      await database.disconnect();
+    } catch (err) {
+      console.error('Error during shutdown:', err);
+    } finally {
+      process.exit(0);
+    }
   });
 });
 

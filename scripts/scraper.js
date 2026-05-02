@@ -1,6 +1,6 @@
 require('dotenv').config();
 const database = require('../config/database');
-const scrapingService = require('../services/scrapingService');
+const scrapingService = require('../src/services/scrapingService');
 
 async function runScraper() {
   try {
