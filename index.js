@@ -70,6 +70,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/articles', require('./src/routes/articles'));
 app.use('/api/sources', require('./src/routes/sources'));
 app.use('/api/scraping', require('./src/routes/scraping'));
+app.use('/api/features', require('./src/routes/features'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

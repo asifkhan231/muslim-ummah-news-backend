@@ -135,7 +135,7 @@ class ScrapingService {
       const maxArticles = Math.min(articleElements.length, this.maxArticlesPerSource);
       let processedCount = 0;
 
-      for (let i = 0; i < maxArticles && processedCount < 5; i++) { // Limit to 5 articles per source for testing
+      for (let i = 0; i < maxArticles; i++) { // Process up to maxArticles
         const element = articleElements[i];
         const articleUrl = this.resolveUrl($(element).attr('href'), source.baseUrl || source.url);
 

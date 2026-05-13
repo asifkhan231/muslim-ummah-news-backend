@@ -42,7 +42,24 @@ const sourceSchema = new mongoose.Schema({
       'education', 'technology', 'health', 'sports', 'human-rights',
       'conflict', 'persecution', 'achievements', 'general'
     ]
-  }]
+  }],
+  credibilityScore: {
+    type: Number,
+    default: 80
+  },
+  tier: {
+    type: String,
+    enum: ['Tier 1', 'Tier 2', 'Tier 3'],
+    default: 'Tier 2'
+  },
+  region: {
+    type: String,
+    default: 'Global'
+  },
+  isUmmahVerified: {
+    type: Boolean,
+    default: false
+  }
 }, {
   timestamps: true
 });
