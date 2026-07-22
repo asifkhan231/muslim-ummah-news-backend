@@ -100,6 +100,14 @@ app.use((err, req, res, next) => {
   });
 });
 
+cron.schedule('54 22 * * *',async () => {
+  console.log("scraping start=====>");
+await scrapingService.scrapeAllSources()
+  console.log("scraping done===>")
+},{
+  timezone:"Asia/Kolkata"
+})
+
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`🚀 Ummah News Hub API running on port ${PORT}`);

@@ -2,7 +2,7 @@ const { generateWithFallback } = require('../../config/groq');
 
 class AIRefinementService {
   constructor() {
-    this.model = 'llama-3.1-8b-instant';
+    this.model = 'qwen/qwen3.6-27b';
   }
 
   async refineArticle({ title, content, source }) {
@@ -18,13 +18,19 @@ STRICT RULES:
 - No commentary
 - No extra text
 
-TASK:
-- Rewrite the article in clear, professional news language
-- Preserve ALL original facts
-- Remove fluff, repetition, navigation text
-- Add brief factual background ONLY if well-known and verifiable
-- Keep neutral tone
-- DO NOT invent names, numbers, quotes, or events
+TASKS:
+- Rewrite every sentence.
+- Never copy more than 8 consecutive words.
+- Preserve every fact.
+- Remove repeated information.
+- Remove navigation text.
+- Remove image captions.
+- Remove copyright/footer.
+- Merge short paragraphs.
+- Keep professional journalism style.
+- Produce smooth transitions.
+- Keep chronological order.
+- Keep all names, dates and numbers exactly.
 
 OUTPUT JSON FORMAT:
 {
@@ -46,9 +52,19 @@ ${content}
     const text = await generateWithFallback(async (client) => {
       const completion = await client.chat.completions.create({
         model: this.model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 700,
+        reasoning_effort: "none",
+        messages: [
+          {
+            role: "system",
+            content: "You are a JSON generator. Respond ONLY with valid JSON."
+          },
+          { role: 'user', content: prompt }
+        ],
+        response_format: {
+          type: "json_object"
+        },
+        temperature: 0.1,
+        max_tokens: 1500,
       });
 
       return completion.choices?.[0]?.message?.content || '';
@@ -61,15 +77,18 @@ ${content}
 
   safeParseJSON(text) {
     try {
-      // Remove markdown fences if model ignores instructions
       const cleaned = text
-        .replace(/```json/g, '')
-        .replace(/```/g, '')
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
         .trim();
 
       return JSON.parse(cleaned);
-    } catch (error) {
-      console.error('❌ AI JSON parse failed');
+    } catch (err) {
+      console.error("========== AI RAW RESPONSE ==========");
+      console.log(text);
+      console.error("=====================================");
+      console.error(err);
+
       return null;
     }
   }

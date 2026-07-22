@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const articleController = require('../controllers/articleController');
+const { getAllArticles } = require('../services/articleService');
 
 // Get all articles with pagination and filtering
 router.get('/', articleController.getAllArticles);
